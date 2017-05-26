@@ -78,25 +78,27 @@ func parseAccessLevel(s string) AccessLevel {
 }
 
 func (res *Resource) scanFiles(resourcePath string) error {
+	// make a map to help check if any files were removed
+	existingFiles := make(map[string]bool)
+
+	for _, f := range res.Files {
+		existingFiles[f.ID] = true
+	}
 
 	filepath.Walk(resourcePath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			// we don't scan directory entries themselves
 			return nil
 		}
-		ID := strings.TrimPrefix(path, resourcePath)
+		ID := strings.TrimPrefix(path, resourcePath+"/")
 		if ID == "FILES.xml" || ID == "LOG.txt" {
 			return nil
 		}
 
-		found := false
-		for _, f := range res.Files {
-			if f.ID == ID {
-				// file was already scanned
-				found = true
-			}
-		}
-		if !found {
+		if _, ok := existingFiles[ID]; ok {
+			// file was already scanned
+			delete(existingFiles, ID)
+		} else {
 			// new file
 			fmt.Println("File added:", ID)
 			res.Files = append(res.Files, File{ID: ID, Size: info.Size()})
@@ -104,6 +106,9 @@ func (res *Resource) scanFiles(resourcePath string) error {
 		return nil
 	})
 
+	for fname := range existingFiles {
+		fmt.Println("File removed:", fname)
+	}
 	return nil
 }
 
